@@ -13,7 +13,7 @@ version = 1.0.0
 # main.py starts TubeGrabApp().run()
 entrypoint = main.py
 
-requirements = python3,kivy,yt-dlp,requests,pillow,ffmpeg
+requirements = python3,kivy,yt_dlp,requests,pillow
 
 orientation = portrait
 fullscreen = 0
@@ -27,7 +27,7 @@ android.ndk_api = 24
 android.archs = arm64-v8a, armeabi-v7a
 
 # Network + external storage access for downloads
-android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 
 # Keep app alive while download threads run
 android.wakelock = True

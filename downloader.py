@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import threading
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -321,18 +322,25 @@ class DownloadEngine:
         if self._ffmpeg_location:
             ydl_opts["ffmpeg_location"] = self._ffmpeg_location
 
+        has_ffmpeg = bool(self._ffmpeg_location or shutil.which("ffmpeg"))
+
         if fmt.format_id == "bestaudio/best" or fmt.is_audio_only:
-            ydl_opts["format"] = "bestaudio/best" if fmt.format_id.startswith("bestaudio") else fmt.format_id
-            ydl_opts["postprocessors"] = [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ]
+            ydl_opts["format"] = "bestaudio/best"
+            if has_ffmpeg:
+                ydl_opts["postprocessors"] = [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "192",
+                    }
+                ]
         else:
-            ydl_opts["format"] = "bestvideo+bestaudio/best" if fmt.format_id.startswith("best") else f"{fmt.format_id}+bestaudio/best"
-            ydl_opts["merge_output_format"] = "mp4"
+            if has_ffmpeg:
+                ydl_opts["format"] = "bestvideo+bestaudio/best" if fmt.format_id.startswith("best") else f"{fmt.format_id}+bestaudio/best"
+                ydl_opts["merge_output_format"] = "mp4"
+            else:
+                # Fallback for environments without ffmpeg: prefer progressive MP4.
+                ydl_opts["format"] = "best[ext=mp4]/best"
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
