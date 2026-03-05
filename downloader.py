@@ -345,8 +345,17 @@ class DownloadEngine:
                 ydl_opts["format"] = f"{fmt.format_id}+bestaudio/best"
                 ydl_opts["merge_output_format"] = "mp4"
             else:
-                # No ffmpeg: download exactly the selected format instead of forcing "best" quality.
-                ydl_opts["format"] = fmt.format_id
+                # No ffmpeg: prefer progressive streams (video+audio in one file) to avoid silent video.
+                # Fall back to a generic best stream if the requested height is unavailable.
+                target_height = max(int(fmt.quality_key or 0), 0)
+                if target_height > 0:
+                    ydl_opts["format"] = (
+                        f"best[height<={target_height}][vcodec!=none][acodec!=none][ext=mp4]/"
+                        f"best[height<={target_height}][vcodec!=none][acodec!=none]/"
+                        "best[ext=mp4]/best"
+                    )
+                else:
+                    ydl_opts["format"] = "best[ext=mp4]/best"
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
