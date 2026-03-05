@@ -1,62 +1,93 @@
-# TubeGrab — Advanced YouTube Downloader
+# TubeGrab - Advanced YouTube Downloader
 
-A premium, feature-rich YouTube video downloader built with Python. Featuring a sleek dark-themed GUI powered by CustomTkinter and the robust yt-dlp backend.
+TubeGrab is a Python-based YouTube downloader with a Kivy UI, designed to run on desktop and be packaged into an Android APK with Buildozer.
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+## Features
 
-## ✨ Features
+- Fetch YouTube metadata (title, channel, duration)
+- Select available video/audio formats from `yt-dlp`
+- Download in a background thread to keep UI responsive
+- Real-time progress updates (percent, size, speed, ETA)
+- Android-friendly default output directory:
+	`/storage/emulated/0/Download/TubeGrab`
 
-- **🔍 Smart Fetch** — Paste a URL and instantly preview title, thumbnail, duration, and channel
-- **📊 Quality Selector** — Choose from all available formats (4K, 1080p, 720p, etc.)
-- **🎵 Audio-Only Mode** — Download as MP3 with best quality
-- **📃 Playlist Support** — Detect and download entire playlists
-- **📈 Real-Time Progress** — Animated progress bar with speed, ETA, and size info
-- **📋 Download Queue** — Queue multiple URLs for batch downloading  
-- **📜 Download History** — Track all past downloads with status indicators
-- **🌗 Dark/Light Theme** — Toggle between dark and light modes
-- **📂 Custom Save Location** — Browse and choose your output folder
+## Tech Stack
 
-## 🚀 Quick Start
+- Kivy (UI)
+- yt-dlp (download engine)
+- Requests
+- Pillow
+
+## Project Structure
+
+```text
+.
+|- main.py            # App entrypoint (runs Kivy app)
+|- app.py             # Kivy UI (mobile-responsive layout)
+|- downloader.py      # Core yt-dlp engine + progress callbacks
+|- buildozer.spec     # Android build configuration
+|- requirements.txt   # Python dependencies
+|- styles.py          # Legacy file (currently unused)
+`- README.md
+```
+
+## Run on Desktop
 
 ### Prerequisites
 
-- Python 3.9+
-- [FFmpeg](https://ffmpeg.org/download.html) installed and on PATH (required for merging video+audio)
+- Python 3.10+ recommended
+- ffmpeg installed on system PATH (recommended for merge/audio conversion)
 
-### Installation
+### Install and Run
 
 ```bash
-# Clone the repo
-cd "yt downloader"
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the app
 python main.py
 ```
 
-## 🛠 Tech Stack
+## Build Android APK (Buildozer)
 
-| Component | Technology |
-|-----------|-----------|
-| Backend   | yt-dlp    |
-| GUI       | CustomTkinter |
-| Imaging   | Pillow    |
-| HTTP      | Requests  |
+Buildozer is Linux-first. On Windows, use WSL2 or Linux for reliable builds.
 
-## 📁 Project Structure
+### 1. Install Build Tools (Linux/WSL)
 
-```
-├── main.py           # Entry point
-├── app.py            # GUI application
-├── downloader.py     # Core download engine
-├── styles.py         # Theme & styling constants
-├── requirements.txt  # Dependencies
-└── README.md         # This file
+- Python, pip, git
+- Buildozer and Cython
+- Java JDK + Android SDK/NDK prerequisites
+
+```bash
+pip install --upgrade pip
+pip install buildozer cython
 ```
 
-## 📝 License
+### 2. Verify `buildozer.spec`
 
-MIT License — feel free to use and modify.
+This repository already includes `buildozer.spec` configured for:
+
+- `entrypoint = main.py`
+- `requirements = python3,kivy,yt-dlp,requests,pillow,ffmpeg`
+- Android permissions for internet and storage access
+
+### 3. Build Debug APK
+
+```bash
+buildozer android debug
+```
+
+Generated APKs are placed in `bin/`.
+
+### 4. Deploy to Device (optional)
+
+```bash
+buildozer android deploy run
+```
+
+## Notes
+
+- No Windows-only binaries are bundled.
+- `downloader.py` uses ffmpeg from environment/PATH (or `FFMPEG_LOCATION` if provided).
+- If Android storage permissions are restricted on newer Android versions, you may need to adjust `buildozer.spec` and/or app storage strategy.
+
+## License
+
+MIT
