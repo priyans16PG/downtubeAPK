@@ -1,0 +1,4 @@
+kivy
+yt-dlp
+requests
+Pillow
