@@ -8,7 +8,7 @@ source.dir = .
 source.include_exts = py,kv,png,jpg,jpeg,txt,md
 source.exclude_dirs = __pycache__,.git,.venv,venv,build,bin
 
-version = 1.1.0
+version = 2.0.0
 
 # main.py starts TubeGrabApp().run()
 entrypoint = main.py
