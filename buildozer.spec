@@ -13,7 +13,7 @@ version = 1.0.0
 # main.py starts TubeGrabApp().run()
 entrypoint = main.py
 
-requirements = python3,kivy,yt_dlp,requests,pillow
+requirements = python3,kivy,yt-dlp
 
 orientation = portrait
 fullscreen = 0
@@ -22,6 +22,7 @@ fullscreen = 0
 android.minapi = 24
 android.api = 34
 android.ndk_api = 24
+android.accept_sdk_license = True
 
 # Target common device architectures
 android.archs = arm64-v8a, armeabi-v7a
