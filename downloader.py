@@ -317,6 +317,8 @@ class DownloadEngine:
             "no_warnings": True,
             "ignoreerrors": True,
             "prefer_ffmpeg": True,
+            "continuedl": True,
+            "nooverwrites": True,
         }
 
         if self._ffmpeg_location:
@@ -325,7 +327,8 @@ class DownloadEngine:
         has_ffmpeg = bool(self._ffmpeg_location or shutil.which("ffmpeg"))
 
         if fmt.format_id == "bestaudio/best" or fmt.is_audio_only:
-            ydl_opts["format"] = "bestaudio/best"
+            # Respect the exact selected audio format when available.
+            ydl_opts["format"] = "bestaudio/best" if fmt.format_id.startswith("best") else fmt.format_id
             if has_ffmpeg:
                 ydl_opts["postprocessors"] = [
                     {
@@ -335,12 +338,15 @@ class DownloadEngine:
                     }
                 ]
         else:
-            if has_ffmpeg:
-                ydl_opts["format"] = "bestvideo+bestaudio/best" if fmt.format_id.startswith("best") else f"{fmt.format_id}+bestaudio/best"
+            if fmt.format_id.startswith("best"):
+                ydl_opts["format"] = "bestvideo+bestaudio/best" if has_ffmpeg else "best[ext=mp4]/best"
+            elif has_ffmpeg:
+                # Merge selected video stream with best audio when ffmpeg is available.
+                ydl_opts["format"] = f"{fmt.format_id}+bestaudio/best"
                 ydl_opts["merge_output_format"] = "mp4"
             else:
-                # Fallback for environments without ffmpeg: prefer progressive MP4.
-                ydl_opts["format"] = "best[ext=mp4]/best"
+                # No ffmpeg: download exactly the selected format instead of forcing "best" quality.
+                ydl_opts["format"] = fmt.format_id
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

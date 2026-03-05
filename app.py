@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import os
 import threading
+from datetime import datetime
 from typing import Optional
 
 from kivy.app import App as KivyApp
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.core.window import Window
+from kivy.core.clipboard import Clipboard
 from kivy.graphics import Color, RoundedRectangle, Triangle
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
@@ -94,10 +97,14 @@ class TubeGrabApp(KivyApp):
         self.fetch_button: Optional[Button] = None
         self.download_button: Optional[Button] = None
         self.cancel_button: Optional[Button] = None
+        self.pause_resume_button: Optional[Button] = None
+        self.path_set_button: Optional[Button] = None
         self.url_input: Optional[TextInput] = None
+        self.path_input: Optional[TextInput] = None
         self.video_title_label: Optional[Label] = None
         self.video_meta_label: Optional[Label] = None
         self.status_label: Optional[Label] = None
+        self.history_label: Optional[Label] = None
         self.progress_text: Optional[Label] = None
         self.progress_bar: Optional[ProgressBar] = None
         self.formats_box: Optional[BoxLayout] = None
@@ -105,6 +112,71 @@ class TubeGrabApp(KivyApp):
         self.loading_message: Optional[Label] = None
         self.loading_dots_event = None
         self.logo_path = os.path.join(os.path.dirname(__file__), "logo", "tubegraplogo.png")
+        self.history_path = os.path.join(os.path.dirname(__file__), "download_history.json")
+        self.download_history = self._load_download_history()
+        self.last_download_url = ""
+        self.last_download_format: Optional[FormatOption] = None
+        self.pause_requested = False
+        self.is_paused = False
+
+    def _load_download_history(self) -> list[dict]:
+        """Load persisted download history if available."""
+        if not os.path.exists(self.history_path):
+            return []
+        try:
+            with open(self.history_path, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            return []
+        return []
+
+    def _save_download_history(self):
+        """Persist download history to disk."""
+        try:
+            with open(self.history_path, "w", encoding="utf-8") as fp:
+                json.dump(self.download_history[-30:], fp, ensure_ascii=True, indent=2)
+        except Exception:
+            pass
+
+    def _add_history_entry(self, status: str, details: str = ""):
+        """Add one history event and refresh UI section."""
+        title = self.video_info.title if self.video_info else "Unknown"
+        fmt = self.selected_format.label if self.selected_format else "Unknown format"
+        target = self._get_selected_output_dir()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        entry = {
+            "time": timestamp,
+            "title": title,
+            "format": fmt,
+            "status": status,
+            "path": target,
+            "details": details,
+        }
+        self.download_history.append(entry)
+        self.download_history = self.download_history[-30:]
+        self._save_download_history()
+        self._refresh_history_label()
+
+    def _refresh_history_label(self):
+        if not self.history_label:
+            return
+        if not self.download_history:
+            self.history_label.text = "No downloads yet."
+            return
+        lines = []
+        for item in reversed(self.download_history[-5:]):
+            status = item.get("status", "")
+            title = item.get("title", "Unknown")
+            tstamp = item.get("time", "")
+            lines.append(f"[{tstamp}] {status}: {title}")
+        self.history_label.text = "\n".join(lines)
+
+    def _get_selected_output_dir(self) -> str:
+        """Read save-path text input and fallback to engine default path."""
+        raw = (self.path_input.text or "").strip() if self.path_input else ""
+        return raw or self.engine.default_output_dir
 
     def _make_logo_widget(self, size_dp: float):
         """Build logo widget from file when available, fallback to vector badge."""
@@ -175,7 +247,7 @@ class TubeGrabApp(KivyApp):
             background_hex=Colors.DARK_BG_SECONDARY,
             orientation="vertical",
             size_hint_y=None,
-            height=dp(180),
+            height=dp(230),
             spacing=dp(10),
             padding=[dp(14), dp(14), dp(14), dp(14)],
         )
@@ -192,11 +264,11 @@ class TubeGrabApp(KivyApp):
         paste_label.bind(size=lambda inst, _: setattr(inst, "text_size", inst.size))
         url_card.add_widget(paste_label)
 
+        url_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(46), spacing=dp(8))
         self.url_input = TextInput(
             hint_text="https://youtube.com/watch?v=...",
             multiline=False,
-            size_hint_y=None,
-            height=dp(46),
+            size_hint=(0.75, 1),
             background_normal="",
             background_active="",
             background_color=_hex_to_rgba(Colors.DARK_BG_INPUT),
@@ -204,7 +276,19 @@ class TubeGrabApp(KivyApp):
             cursor_color=_hex_to_rgba(Colors.ACCENT_RED),
             padding=[dp(12), dp(12), dp(12), dp(12)],
         )
-        url_card.add_widget(self.url_input)
+        url_row.add_widget(self.url_input)
+
+        paste_button = Button(
+            text="Paste",
+            size_hint=(0.25, 1),
+            background_normal="",
+            background_color=_hex_to_rgba(Colors.DARK_BG_CARD),
+            color=_hex_to_rgba(Colors.DARK_TEXT_PRIMARY),
+            bold=True,
+        )
+        paste_button.bind(on_release=self.on_paste_url_pressed)
+        url_row.add_widget(paste_button)
+        url_card.add_widget(url_row)
 
         button_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(46), spacing=dp(8))
         self.fetch_button = Button(
@@ -230,12 +314,50 @@ class TubeGrabApp(KivyApp):
         self.download_button.bind(on_release=self.on_download_pressed)
         button_row.add_widget(self.download_button)
         url_card.add_widget(button_row)
+
+        save_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(42), spacing=dp(8))
+        self.path_input = TextInput(
+            text=self.engine.default_output_dir,
+            multiline=False,
+            size_hint=(0.78, 1),
+            background_normal="",
+            background_active="",
+            background_color=_hex_to_rgba(Colors.DARK_BG_INPUT),
+            foreground_color=_hex_to_rgba(Colors.DARK_TEXT_PRIMARY),
+            padding=[dp(10), dp(10), dp(10), dp(10)],
+        )
+        save_row.add_widget(self.path_input)
+
+        self.path_set_button = Button(
+            text="Set Path",
+            size_hint=(0.22, 1),
+            background_normal="",
+            background_color=_hex_to_rgba(Colors.DARK_BG_CARD),
+            color=_hex_to_rgba(Colors.DARK_TEXT_PRIMARY),
+            bold=True,
+        )
+        self.path_set_button.bind(on_release=self.on_set_path_pressed)
+        save_row.add_widget(self.path_set_button)
+        url_card.add_widget(save_row)
+
         content.add_widget(url_card)
+
+        action_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(42), spacing=dp(8))
+        self.pause_resume_button = Button(
+            text="Pause",
+            size_hint=(0.5, 1),
+            disabled=True,
+            background_normal="",
+            background_color=_hex_to_rgba(Colors.ACCENT_YELLOW),
+            color=(0.1, 0.1, 0.1, 1),
+            bold=True,
+        )
+        self.pause_resume_button.bind(on_release=self.on_pause_resume_pressed)
+        action_row.add_widget(self.pause_resume_button)
 
         self.cancel_button = Button(
             text="Cancel",
-            size_hint_y=None,
-            height=dp(42),
+            size_hint=(0.5, 1),
             disabled=True,
             background_normal="",
             background_color=_hex_to_rgba(Colors.ACCENT_ORANGE),
@@ -243,7 +365,8 @@ class TubeGrabApp(KivyApp):
             bold=True,
         )
         self.cancel_button.bind(on_release=self.on_cancel_pressed)
-        content.add_widget(self.cancel_button)
+        action_row.add_widget(self.cancel_button)
+        content.add_widget(action_row)
 
         preview_card = Card(
             background_hex=Colors.DARK_BG_SECONDARY,
@@ -315,13 +438,13 @@ class TubeGrabApp(KivyApp):
             background_hex=Colors.DARK_BG_SECONDARY,
             orientation="vertical",
             size_hint_y=None,
-            height=dp(84),
+            height=dp(110),
             padding=[dp(14), dp(10), dp(14), dp(10)],
         )
         self.status_label = Label(
-            text=f"Save path: {self.engine.default_output_dir}",
+            text=f"Save path: {self._get_selected_output_dir()}",
             size_hint_y=None,
-            height=dp(56),
+            height=dp(42),
             halign="left",
             valign="top",
             color=_hex_to_rgba(Colors.DARK_TEXT_SECONDARY),
@@ -329,7 +452,20 @@ class TubeGrabApp(KivyApp):
         )
         self.status_label.bind(size=lambda inst, _: setattr(inst, "text_size", inst.size))
         footer_card.add_widget(self.status_label)
+
+        self.history_label = Label(
+            text="No downloads yet.",
+            size_hint_y=None,
+            height=dp(48),
+            halign="left",
+            valign="top",
+            color=_hex_to_rgba(Colors.DARK_TEXT_MUTED),
+            font_size="11sp",
+        )
+        self.history_label.bind(size=lambda inst, _: setattr(inst, "text_size", inst.size))
+        footer_card.add_widget(self.history_label)
         content.add_widget(footer_card)
+        self._refresh_history_label()
 
         scroll.add_widget(content)
         root.add_widget(scroll)
@@ -475,6 +611,24 @@ class TubeGrabApp(KivyApp):
         self._show_loading_overlay("Fetching video details")
         threading.Thread(target=self._fetch_video_info_worker, args=(url,), daemon=True).start()
 
+    def on_paste_url_pressed(self, _instance):
+        text = (Clipboard.paste() or "").strip()
+        if not text:
+            self._set_status("Clipboard is empty.")
+            return
+        if self.url_input:
+            self.url_input.text = text
+        self._set_status("URL pasted from clipboard.")
+
+    def on_set_path_pressed(self, _instance):
+        path = self._get_selected_output_dir()
+        try:
+            os.makedirs(path, exist_ok=True)
+            self.engine.default_output_dir = path
+            self._set_status("Save path updated.")
+        except Exception as exc:
+            self._set_status(f"Invalid save path: {exc}")
+
     def _fetch_video_info_worker(self, url: str):
         try:
             info = self.engine.fetch_info(url)
@@ -548,16 +702,28 @@ class TubeGrabApp(KivyApp):
             self._set_status("Fetch and select a format first.")
             return
 
+        output_dir = self._get_selected_output_dir()
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except Exception as exc:
+            self._set_status(f"Invalid save path: {exc}")
+            return
+
         try:
             self.engine.download(
                 url=url,
                 format_option=self.selected_format,
-                output_dir=self.engine.default_output_dir,
+                output_dir=output_dir,
                 progress_callback=self._on_engine_progress,
             )
         except Exception as exc:
             self._set_status(f"Download start failed: {exc}")
             return
+
+        self.last_download_url = url
+        self.last_download_format = self.selected_format
+        self.pause_requested = False
+        self.is_paused = False
 
         if self.download_button:
             self.download_button.disabled = True
@@ -565,8 +731,50 @@ class TubeGrabApp(KivyApp):
             self.fetch_button.disabled = True
         if self.cancel_button:
             self.cancel_button.disabled = False
+        if self.pause_resume_button:
+            self.pause_resume_button.disabled = False
+            self.pause_resume_button.text = "Pause"
+        if self.path_set_button:
+            self.path_set_button.disabled = True
+        if self.path_input:
+            self.path_input.disabled = True
         self._show_loading_overlay("Starting download")
         self._set_status("Download started...")
+
+    def on_pause_resume_pressed(self, _instance):
+        if self.engine.is_busy:
+            self.pause_requested = True
+            self.engine.cancel()
+            self._set_status("Pausing download...")
+            return
+
+        if not self.is_paused:
+            self._set_status("No paused download to resume.")
+            return
+
+        if not self.last_download_url or self.last_download_format is None:
+            self._set_status("Nothing to resume yet.")
+            return
+
+        output_dir = self._get_selected_output_dir()
+        try:
+            self.engine.download(
+                url=self.last_download_url,
+                format_option=self.last_download_format,
+                output_dir=output_dir,
+                progress_callback=self._on_engine_progress,
+            )
+        except Exception as exc:
+            self._set_status(f"Resume failed: {exc}")
+            return
+
+        self.pause_requested = False
+        self.is_paused = False
+        if self.pause_resume_button:
+            self.pause_resume_button.text = "Pause"
+        if self.cancel_button:
+            self.cancel_button.disabled = False
+        self._set_status("Resuming download...")
 
     def _on_engine_progress(self, progress: DownloadProgress):
         snapshot = {
@@ -607,32 +815,64 @@ class TubeGrabApp(KivyApp):
         if status == "processing":
             self._set_status("Post-processing media...")
         elif status == "finished":
-            self._set_status(f"Finished. Saved to {self.engine.default_output_dir}")
+            self._add_history_entry("Finished")
+            self._set_status(f"Finished. Saved to {self._get_selected_output_dir()}")
             self._reset_buttons_after_download()
         elif status == "cancelled":
-            self._set_status("Download cancelled.")
-            self._reset_buttons_after_download()
+            if self.pause_requested:
+                self.pause_requested = False
+                self.is_paused = True
+                if self.pause_resume_button:
+                    self.pause_resume_button.disabled = False
+                    self.pause_resume_button.text = "Resume"
+                if self.download_button:
+                    self.download_button.disabled = True
+                if self.fetch_button:
+                    self.fetch_button.disabled = True
+                if self.cancel_button:
+                    self.cancel_button.disabled = False
+                self._set_status("Download paused. Press Resume to continue.")
+                self._add_history_entry("Paused")
+            else:
+                self._set_status("Download cancelled.")
+                self._add_history_entry("Cancelled")
+                self._reset_buttons_after_download()
         elif status == "error":
             error_message = data.get("error_message") or "Unknown error"
             self._set_status(f"Download failed: {error_message}")
+            self._add_history_entry("Failed", error_message)
             self._reset_buttons_after_download()
 
     def on_cancel_pressed(self, _instance):
+        if self.is_paused:
+            self._add_history_entry("Cancelled", "Cancelled from paused state")
+            self._set_status("Paused download cancelled.")
+            self._reset_buttons_after_download()
+            return
         self.engine.cancel()
         self._close_loading_modal()
         self._set_status("Cancelling download...")
 
     def _reset_buttons_after_download(self):
+        self.pause_requested = False
+        self.is_paused = False
         if self.download_button:
             self.download_button.disabled = self.selected_format is None
         if self.fetch_button:
             self.fetch_button.disabled = False
         if self.cancel_button:
             self.cancel_button.disabled = True
+        if self.pause_resume_button:
+            self.pause_resume_button.disabled = True
+            self.pause_resume_button.text = "Pause"
+        if self.path_set_button:
+            self.path_set_button.disabled = False
+        if self.path_input:
+            self.path_input.disabled = False
 
     def _set_status(self, message: str):
         if self.status_label:
-            self.status_label.text = f"Save path: {self.engine.default_output_dir}\nStatus: {message}"
+            self.status_label.text = f"Save path: {self._get_selected_output_dir()}\nStatus: {message}"
 
 
 __all__ = ["TubeGrabApp"]
