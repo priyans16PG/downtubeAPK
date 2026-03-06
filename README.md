@@ -88,6 +88,11 @@ buildozer android deploy run
 - `downloader.py` uses ffmpeg from environment/PATH (or `FFMPEG_LOCATION` if provided).
 - If Android storage permissions are restricted on newer Android versions, you may need to adjust `buildozer.spec` and/or app storage strategy.
 
+## Version Updates
+
+- The app UI displays `v<version>` by reading `buildozer.spec` (`version = ...`).
+- For every new release, bump the value in `buildozer.spec` so the version shown in the app updates automatically.
+
 ## License
 
 MIT

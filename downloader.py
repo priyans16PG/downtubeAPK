@@ -327,9 +327,12 @@ class DownloadEngine:
         has_ffmpeg = bool(self._ffmpeg_location or shutil.which("ffmpeg"))
 
         if fmt.format_id == "bestaudio/best" or fmt.is_audio_only:
-            # Respect the exact selected audio format when available.
-            ydl_opts["format"] = "bestaudio/best" if fmt.format_id.startswith("best") else fmt.format_id
-            if has_ffmpeg:
+            # Keep the exact selected audio stream for audio-only formats.
+            selected_audio_format = fmt.format_id or "bestaudio/best"
+            ydl_opts["format"] = selected_audio_format
+
+            # Convert to MP3 only for the explicit "Best Audio Only (MP3)" option.
+            if has_ffmpeg and fmt.format_id == "bestaudio/best":
                 ydl_opts["postprocessors"] = [
                     {
                         "key": "FFmpegExtractAudio",
@@ -346,16 +349,17 @@ class DownloadEngine:
                 ydl_opts["merge_output_format"] = "mp4"
             else:
                 # No ffmpeg: prefer progressive streams (video+audio in one file) to avoid silent video.
-                # Fall back to a generic best stream if the requested height is unavailable.
+                # Try the exact selected format first, then fall back to progressive streams.
                 target_height = max(int(fmt.quality_key or 0), 0)
                 if target_height > 0:
                     ydl_opts["format"] = (
+                        f"{fmt.format_id}/"
                         f"best[height<={target_height}][vcodec!=none][acodec!=none][ext=mp4]/"
                         f"best[height<={target_height}][vcodec!=none][acodec!=none]/"
                         "best[ext=mp4]/best"
                     )
                 else:
-                    ydl_opts["format"] = "best[ext=mp4]/best"
+                    ydl_opts["format"] = f"{fmt.format_id}/best[ext=mp4]/best"
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

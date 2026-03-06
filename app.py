@@ -92,8 +92,10 @@ class TubeGrabApp(KivyApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.engine = DownloadEngine()
+        self.app_version = self._load_app_version()
         self.video_info: Optional[VideoInfo] = None
         self.selected_format: Optional[FormatOption] = None
+        self.format_buttons: list[tuple[Button, FormatOption]] = []
         self.fetch_button: Optional[Button] = None
         self.download_button: Optional[Button] = None
         self.cancel_button: Optional[Button] = None
@@ -118,6 +120,25 @@ class TubeGrabApp(KivyApp):
         self.last_download_format: Optional[FormatOption] = None
         self.pause_requested = False
         self.is_paused = False
+
+    def _load_app_version(self) -> str:
+        """Read app version from buildozer.spec so UI auto-updates when version is bumped."""
+        spec_path = os.path.join(os.path.dirname(__file__), "buildozer.spec")
+        if not os.path.exists(spec_path):
+            return "dev"
+
+        try:
+            with open(spec_path, "r", encoding="utf-8") as fp:
+                for raw_line in fp:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if line.lower().startswith("version") and "=" in line:
+                        return line.split("=", 1)[1].strip() or "dev"
+        except Exception:
+            return "dev"
+
+        return "dev"
 
     def _load_download_history(self) -> list[dict]:
         """Load persisted download history if available."""
@@ -230,7 +251,7 @@ class TubeGrabApp(KivyApp):
         )
         title.bind(size=lambda inst, _: setattr(inst, "text_size", inst.size))
         subtitle = Label(
-            text="Fast video and audio downloads",
+            text=f"Fast video and audio downloads  |  v{self.app_version}",
             color=_hex_to_rgba(Colors.DARK_TEXT_SECONDARY),
             size_hint_y=0.38,
             halign="left",
@@ -438,13 +459,13 @@ class TubeGrabApp(KivyApp):
             background_hex=Colors.DARK_BG_SECONDARY,
             orientation="vertical",
             size_hint_y=None,
-            height=dp(110),
+            height=dp(132),
             padding=[dp(14), dp(10), dp(14), dp(10)],
         )
         self.status_label = Label(
             text=f"Save path: {self._get_selected_output_dir()}",
             size_hint_y=None,
-            height=dp(42),
+            height=dp(64),
             halign="left",
             valign="top",
             color=_hex_to_rgba(Colors.DARK_TEXT_SECONDARY),
@@ -672,6 +693,7 @@ class TubeGrabApp(KivyApp):
             return
 
         self.formats_box.clear_widgets()
+        self.format_buttons = []
         if not formats:
             no_formats = Label(text="No formats available.", size_hint_y=None, height=dp(30), halign="left")
             no_formats.bind(size=lambda inst, _: setattr(inst, "text_size", inst.size))
@@ -683,13 +705,26 @@ class TubeGrabApp(KivyApp):
             text = f"{fmt.label}{suffix}"
             btn = Button(text=text, size_hint_y=None, height=dp(42))
             btn.background_normal = ""
-            btn.background_color = _hex_to_rgba(Colors.DARK_BG_CARD)
-            btn.color = _hex_to_rgba(Colors.DARK_TEXT_PRIMARY)
+            self._style_format_button(btn, fmt == self.selected_format)
             btn.bind(on_release=lambda _btn, current=fmt: self._select_format(current))
             self.formats_box.add_widget(btn)
+            self.format_buttons.append((btn, fmt))
+
+    def _style_format_button(self, button: Button, is_selected: bool):
+        if is_selected:
+            button.background_color = _hex_to_rgba(Colors.ACCENT_BLUE)
+            button.color = (1, 1, 1, 1)
+        else:
+            button.background_color = _hex_to_rgba(Colors.DARK_BG_CARD)
+            button.color = _hex_to_rgba(Colors.DARK_TEXT_PRIMARY)
+
+    def _refresh_format_button_selection(self):
+        for button, fmt in self.format_buttons:
+            self._style_format_button(button, fmt == self.selected_format)
 
     def _select_format(self, fmt: FormatOption):
         self.selected_format = fmt
+        self._refresh_format_button_selection()
         self._set_status(f"Selected format: {fmt.label}")
 
     def on_download_pressed(self, _instance):
@@ -872,7 +907,11 @@ class TubeGrabApp(KivyApp):
 
     def _set_status(self, message: str):
         if self.status_label:
-            self.status_label.text = f"Save path: {self._get_selected_output_dir()}\nStatus: {message}"
+            self.status_label.text = (
+                f"TubeGrab v{self.app_version}\n"
+                f"Save path: {self._get_selected_output_dir()}\n"
+                f"Status: {message}"
+            )
 
 
 __all__ = ["TubeGrabApp"]
