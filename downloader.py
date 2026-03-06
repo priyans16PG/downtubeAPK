@@ -20,6 +20,7 @@ class FormatOption:
     ext: str
     filesize: Optional[int] = None
     is_audio_only: bool = False
+    has_audio: bool = False
     quality_key: int = 0
 
 
@@ -185,18 +186,31 @@ class DownloadEngine:
         resolution_map: dict[int, FormatOption] = {}
         for item in raw_formats:
             vcodec = item.get("vcodec", "none")
+            acodec = item.get("acodec", "none")
             height = item.get("height")
             ext = item.get("ext", "mp4")
             if vcodec != "none" and height:
                 label = f"{height}p ({ext.upper()})"
                 existing = resolution_map.get(int(height))
                 size = item.get("filesize") or item.get("filesize_approx")
-                if existing is None or (size or 0) > (existing.filesize or 0):
+                candidate_has_audio = acodec != "none"
+                if existing is None:
+                    should_replace = True
+                elif candidate_has_audio and not existing.has_audio:
+                    # Prefer progressive (video+audio) variants at the same resolution.
+                    should_replace = True
+                elif candidate_has_audio == existing.has_audio and (size or 0) > (existing.filesize or 0):
+                    should_replace = True
+                else:
+                    should_replace = False
+
+                if should_replace:
                     resolution_map[int(height)] = FormatOption(
                         format_id=item.get("format_id", ""),
                         label=label,
                         ext=ext,
                         filesize=size,
+                        has_audio=candidate_has_audio,
                         quality_key=int(height),
                     )
 
@@ -254,6 +268,7 @@ class DownloadEngine:
         url: str,
         format_option: FormatOption,
         output_dir: str,
+        download_full_playlist: bool = False,
         progress_callback: Callable[[DownloadProgress], None] | None = None,
     ) -> None:
         if self._is_busy:
@@ -264,7 +279,13 @@ class DownloadEngine:
 
         def _run_download() -> None:
             try:
-                self._do_download(url, format_option, output_dir, progress_callback)
+                self._do_download(
+                    url,
+                    format_option,
+                    output_dir,
+                    download_full_playlist,
+                    progress_callback,
+                )
             finally:
                 self._is_busy = False
 
@@ -276,6 +297,7 @@ class DownloadEngine:
         url: str,
         fmt: FormatOption,
         output_dir: str,
+        download_full_playlist: bool,
         callback: Callable[[DownloadProgress], None] | None,
     ) -> None:
         progress = DownloadProgress(status="downloading")
@@ -319,7 +341,13 @@ class DownloadEngine:
             "prefer_ffmpeg": True,
             "continuedl": True,
             "nooverwrites": True,
+            # When False, yt-dlp downloads only the first item from a playlist URL.
+            "noplaylist": not download_full_playlist,
         }
+
+        if download_full_playlist:
+            # Keep playlist items ordered and avoid filename collisions.
+            ydl_opts["outtmpl"] = os.path.join(output_dir, "%(playlist_index)03d - %(title)s.%(ext)s")
 
         if self._ffmpeg_location:
             ydl_opts["ffmpeg_location"] = self._ffmpeg_location
@@ -345,21 +373,30 @@ class DownloadEngine:
                 ydl_opts["format"] = "bestvideo+bestaudio/best" if has_ffmpeg else "best[ext=mp4]/best"
             elif has_ffmpeg:
                 # Merge selected video stream with best audio when ffmpeg is available.
-                ydl_opts["format"] = f"{fmt.format_id}+bestaudio/best"
-                ydl_opts["merge_output_format"] = "mp4"
+                if fmt.has_audio:
+                    ydl_opts["format"] = fmt.format_id
+                else:
+                    ydl_opts["format"] = f"{fmt.format_id}+bestaudio/best"
+                    ydl_opts["merge_output_format"] = "mp4"
             else:
                 # No ffmpeg: prefer progressive streams (video+audio in one file) to avoid silent video.
-                # Try the exact selected format first, then fall back to progressive streams.
+                # Never force video-only ids first here; choose audio+video streams to avoid silent files.
                 target_height = max(int(fmt.quality_key or 0), 0)
                 if target_height > 0:
-                    ydl_opts["format"] = (
-                        f"{fmt.format_id}/"
+                    progressive_fallback = (
                         f"best[height<={target_height}][vcodec!=none][acodec!=none][ext=mp4]/"
                         f"best[height<={target_height}][vcodec!=none][acodec!=none]/"
                         "best[ext=mp4]/best"
                     )
+                    if fmt.has_audio:
+                        ydl_opts["format"] = f"{fmt.format_id}/{progressive_fallback}"
+                    else:
+                        ydl_opts["format"] = progressive_fallback
                 else:
-                    ydl_opts["format"] = f"{fmt.format_id}/best[ext=mp4]/best"
+                    if fmt.has_audio:
+                        ydl_opts["format"] = f"{fmt.format_id}/best[ext=mp4]/best"
+                    else:
+                        ydl_opts["format"] = "best[ext=mp4]/best"
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

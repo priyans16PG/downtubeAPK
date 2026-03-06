@@ -8,8 +8,8 @@ source.dir = .
 source.include_exts = py,kv,png,jpg,jpeg,txt,md
 source.exclude_dirs = __pycache__,.git,.venv,venv,build,bin
 
-version = 2.0.1
-android.numeric_version = 20001
+version = 2.0.2
+android.numeric_version = 20002
 
 # main.py starts TubeGrabApp().run()
 entrypoint = main.py

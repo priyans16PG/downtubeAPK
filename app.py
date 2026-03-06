@@ -101,6 +101,7 @@ class TubeGrabApp(KivyApp):
         self.cancel_button: Optional[Button] = None
         self.pause_resume_button: Optional[Button] = None
         self.path_set_button: Optional[Button] = None
+        self.playlist_mode_button: Optional[Button] = None
         self.url_input: Optional[TextInput] = None
         self.path_input: Optional[TextInput] = None
         self.video_title_label: Optional[Label] = None
@@ -118,6 +119,8 @@ class TubeGrabApp(KivyApp):
         self.download_history = self._load_download_history()
         self.last_download_url = ""
         self.last_download_format: Optional[FormatOption] = None
+        self.download_full_playlist = False
+        self.last_download_full_playlist = False
         self.pause_requested = False
         self.is_paused = False
 
@@ -164,6 +167,8 @@ class TubeGrabApp(KivyApp):
     def _add_history_entry(self, status: str, details: str = ""):
         """Add one history event and refresh UI section."""
         title = self.video_info.title if self.video_info else "Unknown"
+        if self.video_info and self.video_info.is_playlist and self.download_full_playlist:
+            title = self.video_info.playlist_title or title
         fmt = self.selected_format.label if self.selected_format else "Unknown format"
         target = self._get_selected_output_dir()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -268,7 +273,7 @@ class TubeGrabApp(KivyApp):
             background_hex=Colors.DARK_BG_SECONDARY,
             orientation="vertical",
             size_hint_y=None,
-            height=dp(230),
+            height=dp(276),
             spacing=dp(10),
             padding=[dp(14), dp(14), dp(14), dp(14)],
         )
@@ -360,6 +365,20 @@ class TubeGrabApp(KivyApp):
         self.path_set_button.bind(on_release=self.on_set_path_pressed)
         save_row.add_widget(self.path_set_button)
         url_card.add_widget(save_row)
+
+        playlist_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(40), spacing=dp(8))
+        self.playlist_mode_button = Button(
+            text="Playlist Mode: Single Video",
+            size_hint=(1, 1),
+            background_normal="",
+            background_color=_hex_to_rgba(Colors.DARK_BG_CARD),
+            color=_hex_to_rgba(Colors.DARK_TEXT_PRIMARY),
+            bold=True,
+        )
+        self.playlist_mode_button.bind(on_release=self.on_playlist_mode_pressed)
+        playlist_row.add_widget(self.playlist_mode_button)
+        url_card.add_widget(playlist_row)
+        self._refresh_playlist_mode_button()
 
         content.add_widget(url_card)
 
@@ -662,10 +681,19 @@ class TubeGrabApp(KivyApp):
         self.video_info = info
         self.selected_format = info.formats[0] if info.formats else None
 
+        if info.is_playlist:
+            self.download_full_playlist = True
+        else:
+            self.download_full_playlist = False
+        self._refresh_playlist_mode_button()
+
         if self.video_title_label:
             self.video_title_label.text = info.title or "Untitled video"
         if self.video_meta_label:
             meta = f"{info.channel or 'Unknown channel'} | {info.duration_str}"
+            if info.is_playlist:
+                count = info.playlist_count or 0
+                meta = f"Playlist: {info.playlist_title or info.title} | {count} items"
             self.video_meta_label.text = meta
 
         self._rebuild_format_buttons(info.formats)
@@ -727,6 +755,39 @@ class TubeGrabApp(KivyApp):
         self._refresh_format_button_selection()
         self._set_status(f"Selected format: {fmt.label}")
 
+    def _refresh_playlist_mode_button(self):
+        if not self.playlist_mode_button:
+            return
+
+        if self.video_info and self.video_info.is_playlist:
+            if self.download_full_playlist:
+                self.playlist_mode_button.text = "Playlist Mode: Full Playlist"
+                self.playlist_mode_button.background_color = _hex_to_rgba(Colors.ACCENT_BLUE)
+                self.playlist_mode_button.color = (1, 1, 1, 1)
+            else:
+                self.playlist_mode_button.text = "Playlist Mode: First Video Only"
+                self.playlist_mode_button.background_color = _hex_to_rgba(Colors.DARK_BG_CARD)
+                self.playlist_mode_button.color = _hex_to_rgba(Colors.DARK_TEXT_PRIMARY)
+            self.playlist_mode_button.disabled = False
+            return
+
+        self.playlist_mode_button.text = "Playlist Mode: Single Video"
+        self.playlist_mode_button.background_color = _hex_to_rgba(Colors.DARK_BG_CARD)
+        self.playlist_mode_button.color = _hex_to_rgba(Colors.DARK_TEXT_MUTED)
+        self.playlist_mode_button.disabled = True
+
+    def on_playlist_mode_pressed(self, _instance):
+        if not self.video_info or not self.video_info.is_playlist:
+            self._set_status("Load a playlist URL to change playlist mode.")
+            return
+
+        self.download_full_playlist = not self.download_full_playlist
+        self._refresh_playlist_mode_button()
+        if self.download_full_playlist:
+            self._set_status("Playlist mode set to full playlist download.")
+        else:
+            self._set_status("Playlist mode set to first video only.")
+
     def on_download_pressed(self, _instance):
         url = (self.url_input.text or "").strip() if self.url_input else ""
         if not url:
@@ -749,6 +810,7 @@ class TubeGrabApp(KivyApp):
                 url=url,
                 format_option=self.selected_format,
                 output_dir=output_dir,
+                download_full_playlist=self.download_full_playlist,
                 progress_callback=self._on_engine_progress,
             )
         except Exception as exc:
@@ -757,6 +819,7 @@ class TubeGrabApp(KivyApp):
 
         self.last_download_url = url
         self.last_download_format = self.selected_format
+        self.last_download_full_playlist = self.download_full_playlist
         self.pause_requested = False
         self.is_paused = False
 
@@ -774,7 +837,11 @@ class TubeGrabApp(KivyApp):
         if self.path_input:
             self.path_input.disabled = True
         self._show_loading_overlay("Starting download")
-        self._set_status("Download started...")
+        if self.video_info and self.video_info.is_playlist and self.download_full_playlist:
+            count = self.video_info.playlist_count or 0
+            self._set_status(f"Playlist download started ({count} items)...")
+        else:
+            self._set_status("Download started...")
 
     def on_pause_resume_pressed(self, _instance):
         if self.engine.is_busy:
@@ -797,6 +864,7 @@ class TubeGrabApp(KivyApp):
                 url=self.last_download_url,
                 format_option=self.last_download_format,
                 output_dir=output_dir,
+                download_full_playlist=self.last_download_full_playlist,
                 progress_callback=self._on_engine_progress,
             )
         except Exception as exc:
@@ -904,6 +972,7 @@ class TubeGrabApp(KivyApp):
             self.path_set_button.disabled = False
         if self.path_input:
             self.path_input.disabled = False
+        self._refresh_playlist_mode_button()
 
     def _set_status(self, message: str):
         if self.status_label:

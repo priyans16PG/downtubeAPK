@@ -6,6 +6,7 @@ TubeGrab is a Python-based YouTube downloader with a Kivy UI, designed to run on
 
 - Fetch YouTube metadata (title, channel, duration)
 - Select available video/audio formats from `yt-dlp`
+- Full playlist download mode (or first-video-only mode)
 - Download in a background thread to keep UI responsive
 - Real-time progress updates (percent, size, speed, ETA)
 - Android-friendly default output directory:
