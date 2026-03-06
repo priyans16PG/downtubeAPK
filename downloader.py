@@ -108,6 +108,15 @@ class DownloadEngine:
         return None
 
     @staticmethod
+    def _safe_dir_name(name: str) -> str:
+        """Sanitize folder name for Windows/Android file systems."""
+        if not name:
+            return "Playlist"
+        cleaned = "".join("_" if ch in '<>:"/\\|?*' else ch for ch in name)
+        cleaned = cleaned.strip().rstrip(".")
+        return cleaned or "Playlist"
+
+    @staticmethod
     def sizeof_fmt(num: float | int | None) -> str:
         if num is None or num <= 0:
             return "?"
@@ -269,6 +278,7 @@ class DownloadEngine:
         format_option: FormatOption,
         output_dir: str,
         download_full_playlist: bool = False,
+        playlist_title: str = "",
         progress_callback: Callable[[DownloadProgress], None] | None = None,
     ) -> None:
         if self._is_busy:
@@ -284,6 +294,7 @@ class DownloadEngine:
                     format_option,
                     output_dir,
                     download_full_playlist,
+                    playlist_title,
                     progress_callback,
                 )
             finally:
@@ -298,6 +309,7 @@ class DownloadEngine:
         fmt: FormatOption,
         output_dir: str,
         download_full_playlist: bool,
+        playlist_title: str,
         callback: Callable[[DownloadProgress], None] | None,
     ) -> None:
         progress = DownloadProgress(status="downloading")
@@ -346,8 +358,11 @@ class DownloadEngine:
         }
 
         if download_full_playlist:
-            # Keep playlist items ordered and avoid filename collisions.
-            ydl_opts["outtmpl"] = os.path.join(output_dir, "%(playlist_index)03d - %(title)s.%(ext)s")
+            # Save full playlists into a dedicated folder named after playlist title.
+            folder_name = self._safe_dir_name(playlist_title)
+            playlist_dir = os.path.join(output_dir, folder_name)
+            os.makedirs(playlist_dir, exist_ok=True)
+            ydl_opts["outtmpl"] = os.path.join(playlist_dir, "%(playlist_index)03d - %(title)s.%(ext)s")
 
         if self._ffmpeg_location:
             ydl_opts["ffmpeg_location"] = self._ffmpeg_location

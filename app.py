@@ -1087,6 +1087,7 @@ class TubeGrabApp(KivyApp):
                 format_option=self.selected_format,
                 output_dir=output_dir,
                 download_full_playlist=self.download_full_playlist,
+                playlist_title=(self.video_info.playlist_title if self.video_info else ""),
                 progress_callback=self._on_engine_progress,
             )
         except Exception as exc:
@@ -1137,6 +1138,7 @@ class TubeGrabApp(KivyApp):
                 format_option=self.last_download_format,
                 output_dir=output_dir,
                 download_full_playlist=self.last_download_full_playlist,
+                playlist_title=(self.video_info.playlist_title if self.video_info else ""),
                 progress_callback=self._on_engine_progress,
             )
         except Exception:
