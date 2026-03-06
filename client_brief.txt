@@ -1,0 +1,70 @@
+TubeGrab UI Reboot - Client Brief (1 Page)
+==========================================
+
+Project Goal
+------------
+Transform TubeGrab from a utility-style single screen into a modern, professional, multi-screen mobile app with a clear download workflow and a dedicated download manager experience.
+
+Why This Reboot
+---------------
+- Current UX mixes too many tasks on one long screen.
+- Users need clearer steps and better visibility of download status.
+- Product should feel polished and consumer-grade, not developer-oriented.
+
+New Product Experience
+----------------------
+Primary journey:
+Home -> Fetch -> Format Selection -> Active Download -> Download Manager -> History
+
+Design Direction
+----------------
+- Minimal, structured, and confident.
+- Task-focused screens (one primary purpose per screen).
+- Clear hierarchy with strong main actions.
+- Clean transitions so users always know where they are.
+
+Core Screens
+------------
+1) Home
+- Paste URL, Fetch Info, see recent links.
+
+2) Media Info
+- Preview video/playlist metadata.
+- Playlist mode selector: Single Video, First Video, Full Playlist.
+
+3) Format Selection
+- Choose quality/audio format from list.
+- Confirm save location.
+- Start Download.
+
+4) Active Download
+- Large progress indicator with details (size, speed, ETA).
+- Controls: Pause/Resume/Cancel.
+- Completion actions: Open File, Show in Folder, Return Home.
+
+5) Download Manager
+- Tabs: Active, Completed, Failed.
+- Per-item actions (pause/cancel/open/retry).
+
+6) History
+- Timeline of completed/failed actions with timestamps.
+
+Key Requirements
+----------------
+- Bottom navigation for quick access to Downloads and History.
+- Dedicated states for loading, paused, failed, completed.
+- Strong selected states for format and playlist options.
+- Mobile-first portrait layout with touch-friendly controls.
+- Dark theme with high contrast and restrained accent usage.
+
+Success Criteria
+----------------
+- Users can complete downloads with less confusion.
+- Progress and control are visible at all times.
+- UI looks and feels like a modern consumer app.
+
+Deliverables
+------------
+- Full product specification: style.txt
+- Figma production checklist + acceptance criteria: figma_checklist.txt
+- This summary brief for stakeholders: client_brief.txt

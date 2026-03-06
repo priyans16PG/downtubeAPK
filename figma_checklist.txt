@@ -1,0 +1,190 @@
+TubeGrab Figma Checklist + Acceptance Criteria
+=============================================
+
+How to Use
+----------
+- Use this as the design QA checklist before handoff.
+- A screen is "accepted" only when all items under that screen are completed.
+- Keep all flows mobile-first (Android portrait baseline).
+
+Global Foundations (Required Before Screen Design)
+---------------------------------------------------
+[ ] Define color styles: background, surface, text-primary, text-secondary, success, warning, danger, accent.
+[ ] Define typography scale: title, heading, body, caption, button.
+[ ] Define spacing scale: 8, 16, 24, 32.
+[ ] Define corner radii tokens: input, card, button.
+[ ] Define elevation/shadow usage rules (minimal, consistent).
+[ ] Define icon style (filled/outlined) and icon sizes.
+[ ] Define button variants: primary, secondary, danger, disabled.
+[ ] Define input states: default, focused, error, disabled.
+[ ] Define list row states: default, pressed, selected, disabled.
+[ ] Define motion guidance (duration/easing) for transitions and loading states.
+
+Navigation + App Shell
+----------------------
+[ ] Bottom navigation includes at least Downloads and History.
+[ ] Top bars are consistent across screens (height, spacing, title alignment).
+[ ] Back navigation is present on non-root screens.
+[ ] Active tab and active nav state are visually clear.
+
+Acceptance Criteria
+- User can always identify current screen and next primary action in under 2 seconds.
+- Navigation is consistent and does not shift layout unexpectedly between screens.
+
+Screen 1: Home (URL Entry)
+--------------------------
+Checklist
+[ ] Top nav: logo, app title, subtitle, version indicator.
+[ ] Large URL field with link icon and placeholder text.
+[ ] Paste utility action is visible and reachable.
+[ ] Primary full-width "Fetch Info" button is dominant.
+[ ] Helper text below CTA: supports single videos + playlists.
+[ ] Recent links section exists with reusable rows.
+[ ] Empty state for recent links is designed.
+[ ] Error state for invalid URL is designed.
+
+Acceptance Criteria
+- Primary CTA is visually strongest element on screen.
+- URL entry area is usable with one hand on common phone sizes.
+- Recent link rows are tappable and clearly reusable.
+
+Screen 2: Media Info
+--------------------
+Checklist
+[ ] Top bar with back arrow + "Video Info" title.
+[ ] Media preview card for single video (thumbnail, title, channel, duration).
+[ ] Playlist preview variant (thumbnail, playlist title, video count).
+[ ] Playlist mode segmented control: Single Video / First Video / Full Playlist.
+[ ] Default selected mode for playlist = Full Playlist.
+[ ] "Choose Format" CTA at bottom and always visible.
+[ ] Loading transition state from Fetch -> Media Info is defined.
+
+Acceptance Criteria
+- Single-video and playlist variants are clearly distinguishable.
+- Segmented control selected state is obvious without relying on color alone.
+- User can proceed to next step with one prominent action.
+
+Screen 3: Format Selection
+--------------------------
+Checklist
+[ ] Top bar with back arrow + "Select Format" title.
+[ ] Compact media summary (thumbnail, title, duration).
+[ ] Scrollable format list with radio indicator per row.
+[ ] Row content supports format name, file size, quality/bitrate details.
+[ ] Selected row style is unambiguous.
+[ ] Save location section with folder icon + path + change action.
+[ ] Primary "Start Download" button pinned or consistently placed.
+[ ] Long-title truncation behavior is defined.
+[ ] Empty/no-format state is designed.
+
+Acceptance Criteria
+- Selecting a format gives immediate visual confirmation.
+- Save path is visible before user starts download.
+- CTA remains discoverable without long scrolling effort.
+
+Screen 4: Active Download
+-------------------------
+Checklist
+[ ] Top bar title: "Downloading".
+[ ] Download card includes thumbnail + title.
+[ ] Large progress bar with clear percentage text.
+[ ] Metrics block includes downloaded/total, speed, ETA.
+[ ] Pause/Resume/Cancel controls are grouped and clear.
+[ ] Paused state visual treatment is defined.
+[ ] Error/failure state is defined.
+[ ] Completion state with actions: Open File, Show in Folder, Return Home.
+[ ] Loading/processing state for post-download operations is defined.
+
+Acceptance Criteria
+- Progress readability at a glance (percent + metrics visible together).
+- Pause and cancel are never ambiguous or hidden.
+- Completion state clearly changes from active state and provides next actions.
+
+Screen 5: Download Manager
+--------------------------
+Checklist
+[ ] Top bar title: "Downloads".
+[ ] Tabs: Active / Completed / Failed.
+[ ] Active rows: thumbnail, title, progress, pause, cancel.
+[ ] Completed rows: thumbnail, title, size, open action.
+[ ] Failed rows: error indicator + retry action.
+[ ] Empty states for each tab.
+[ ] Large-list scrolling behavior is considered.
+
+Acceptance Criteria
+- Tab switching is instant and state is retained.
+- Each tab communicates status clearly (active/completed/failed).
+- Row actions are clear and touch-friendly.
+
+Screen 6: History
+-----------------
+Checklist
+[ ] History list shows time, status icon, item title.
+[ ] Status icon set includes completed and failed at minimum.
+[ ] Rows are legible with long titles.
+[ ] Empty state is present.
+[ ] Optional filter/sort treatment (if included) is consistent.
+
+Acceptance Criteria
+- User can quickly scan what happened and when.
+- Status meaning is clear from both icon and text.
+
+Overlay: Loading
+----------------
+Checklist
+[ ] Centered spinner/indicator.
+[ ] Contextual message text (fetching, processing, etc.).
+[ ] Background dim/blur treatment consistent with app style.
+[ ] Blocking vs non-blocking behavior defined per use case.
+
+Acceptance Criteria
+- User understands app is working and what stage is in progress.
+
+Splash Screen
+-------------
+Checklist
+[ ] Centered logo and app name.
+[ ] Subtitle and bottom initialization text.
+[ ] Dark gradient background treatment.
+[ ] Quick transition to Home with no abrupt flicker.
+
+Acceptance Criteria
+- Branding is clear but splash duration does not block usability.
+
+Accessibility QA
+----------------
+[ ] Text contrast meets accessible standards for dark theme.
+[ ] Body text remains legible on small Android devices.
+[ ] Interactive targets >= 44dp touch height.
+[ ] Focus/selected/disabled states are distinguishable.
+[ ] Color is not sole status indicator (icons/text included).
+
+Responsive + Device QA
+----------------------
+[ ] Baseline design for common Android portrait resolution.
+[ ] Handles smaller-height devices without broken CTAs.
+[ ] Handles long text and localization expansion gracefully.
+
+Prototype Flow QA (Figma)
+-------------------------
+[ ] Home -> Media Info -> Format Selection -> Active Download -> Download Manager.
+[ ] Entry to History from bottom nav works.
+[ ] Back navigation works from all non-root screens.
+[ ] Playlist mode path is prototyped (Full Playlist and First Video paths).
+[ ] Error path is prototyped (invalid URL / failed download).
+
+Handoff Package (Designer to Developer)
+---------------------------------------
+[ ] Page structure organized by screen and state.
+[ ] Components published with variant names and state labels.
+[ ] Design tokens documented (color/type/spacing/radius).
+[ ] Redlines/specs included for spacing and sizing.
+[ ] Export-ready assets/icons included or linked.
+[ ] Notes include interaction rules and transition behavior.
+
+Final Sign-off Criteria
+-----------------------
+[ ] No stacked-card single-page layout pattern remains.
+[ ] Multi-screen task flow is clear and stage-based.
+[ ] Download management feels like a dedicated feature, not an afterthought.
+[ ] UI appears consumer-grade, minimal, and confident.
