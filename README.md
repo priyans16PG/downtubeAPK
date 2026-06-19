@@ -1,4 +1,4 @@
-# TubeGrab - Advanced YouTube Downloader
+# TubeGrab - Advanced YouTube Downloader (vibe coded fully)
 
 TubeGrab is a Python-based YouTube downloader with a Kivy UI, designed to run on desktop and be packaged into an Android APK with Buildozer.
 
